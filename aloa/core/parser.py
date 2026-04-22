@@ -44,8 +44,14 @@ INTENT_PATTERNS: list[tuple[str, list[str]]] = [
     ("suggest",    ["suggest", "suggestions", "recommend", "optimize", "fix it", "fix"]),
     ("cleanup",    ["cleanup", "clean up", "clean", "clear cache", "clear temp"]),
 
-    # General
-    ("help",       ["help", "commands", "what can you do", "?"]),
+    # General Task & Development
+    ("git",        ["git", "clone", "pull", "push", "commit", "checkout", "branch"]),
+    ("file",       ["file", "folder", "directory", "mkdir", "ls", "list", "copy", "move", "rename"]),
+    ("task",       ["task", "do", "run", "execute", "perform", "make", "create", "initialize"]),
+    ("system_cmd", ["ipconfig", "ping", "netstat", "tasklist", "whoami", "hostname"]),
+
+    # General Meta
+    ("help",       ["help", "commands", "what can you do", "?"],),
     ("exit",       ["exit", "quit", "bye", "close"]),
 ]
 
@@ -53,8 +59,9 @@ INTENT_PATTERNS: list[tuple[str, list[str]]] = [
 def parse(user_input: str) -> ParsedCommand:
     """Parse a user input string into a structured command.
 
-    Uses keyword matching to determine intent, then extracts the target
-    (typically an application name) from the remaining text.
+    Uses keyword matching to determine intent, then extracts the target.
+    If no static intent matches, the command is treated as a `smart_task`
+    for the LLM to handle.
     """
     raw = user_input.strip()
     if not raw:
@@ -62,8 +69,8 @@ def parse(user_input: str) -> ParsedCommand:
 
     text = raw.lower()
 
-    # Try to match intent patterns (longest match first for accuracy)
-    matched_intent = "unknown"
+    # Try to match intent patterns
+    matched_intent = "smart_task"  # Default to smart_task instead of unknown
     matched_phrase = ""
 
     for intent, phrases in INTENT_PATTERNS:

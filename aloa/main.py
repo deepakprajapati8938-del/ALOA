@@ -13,6 +13,10 @@ Entry point for the ALOA interactive CLI.
 
 import sys
 import os
+from dotenv import load_dotenv
+
+# Load environment variables for LLM providers
+load_dotenv()
 
 # Ensure the project root is on the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -51,6 +51,14 @@ class Agent:
         # ── Health overview ──
         self._handlers["health"] = self._handle_health_overview
 
+        # ── Smart & Generic handlers ──
+        from core.smart_executor import handle_smart_task
+        self._handlers["smart_task"] = handle_smart_task
+        self._handlers["git"] = handle_smart_task
+        self._handlers["file"] = handle_smart_task
+        self._handlers["task"] = handle_smart_task
+        self._handlers["system_cmd"] = handle_smart_task
+
         # ── Meta handlers ──
         self._handlers["help"] = self._handle_help
         self._handlers["exit"] = self._handle_exit
@@ -58,18 +66,155 @@ class Agent:
     # ── Execution ───────────────────────────────────────────────────
 
     def execute(self, user_input: str):
-        """Parse and execute a user command."""
-        cmd = parse(user_input)
+        """Classify user input and route to query or action path."""
+        # Fast path for meta commands
+        stripped = user_input.strip().lower()
+        if stripped in ["exit", "quit", "bye"]:
+            self._handle_exit(None)
+            return
+        if stripped in ["help", "?", "commands"]:
+            self._handle_help(None)
+            return
 
-        handler = self._handlers.get(cmd.intent)
-        if handler:
-            handler(cmd)
-        else:
-            console.print(error_panel(
-                f"I didn't understand: [bold]{cmd.raw}[/bold]\n\n"
-                "Type [cyan]help[/cyan] to see available commands.",
-                title="Unknown Command"
+        from llm.planner import classify_and_plan, interpret_output, generate_action_plan
+        from utils.shell import capture_shell_output
+        from utils.cache import answer_cache, normalize_key
+        from core.smart_executor import extract_commands, handle_llm_result
+        from rich.panel import Panel
+        from rich.status import Status
+
+        # ── Phase 1: Classify (instant for known patterns) ───────────
+        plan = classify_and_plan(user_input)
+        ttl  = plan.get("_ttl", 30)
+
+        # ── Direct answer (no commands needed) ───────────────────────
+        if plan.get("direct_answer"):
+            console.print(Panel(
+                f"[bold green]{plan['direct_answer']}[/bold green]",
+                title="[bold magenta]ALOA[/bold magenta]",
+                border_style="green",
             ))
+            return
+
+        # ── Query path (read-only, auto-execute) ─────────────────────
+        if plan.get("type") == "query" and plan.get("safe"):
+            commands = plan.get("commands", [])
+            if not commands:
+                # If there's no direct answer and no commands, it's just a conversational prompt.
+                with Status("[bold cyan]Generating response...[/bold cyan]", spinner="dots"):
+                    answer, _ = interpret_output(user_input, "No system commands needed. Just answer as an AI assistant.", ttl=ttl)
+                console.print(Panel(
+                    f"[bold white]{answer}[/bold white]",
+                    title="[bold magenta]ALOA Answer[/bold magenta]",
+                    border_style="magenta",
+                ))
+                return
+
+            # ── Layer 1: answer cache (entire question cached) ────────
+            ans_key = f"ans:{normalize_key(user_input)}"
+            cached_answer = answer_cache.get(ans_key)
+            if cached_answer is not None:
+                remaining = answer_cache.remaining_ttl(ans_key)
+                console.print(Panel(
+                    f"[bold white]{cached_answer}[/bold white]",
+                    title=f"[bold magenta]ALOA Answer[/bold magenta] [dim green](cached, {remaining}s left)[/dim green]",
+                    border_style="magenta",
+                ))
+                return
+
+            # ── Layer 2: run commands (each has its own command cache) ─
+            console.print(Panel(
+                f"[dim]{plan.get('description', 'Running query...')}[/dim]",
+                title="[bold cyan]Query[/bold cyan]",
+                border_style="cyan",
+            ))
+
+            all_output_parts = []
+            for cmd in commands:
+                output, ok = capture_shell_output(cmd, ttl=ttl)
+                if output:
+                    all_output_parts.append(output)
+
+            raw_output = "\n".join(all_output_parts).strip()
+
+            # ── Layer 3: LLM interpret (cached by output hash in planner)
+            with Status("[bold cyan]Interpreting result...[/bold cyan]", spinner="dots"):
+                answer, from_llm_cache = interpret_output(user_input, raw_output, ttl=ttl)
+
+            # Also cache at the question level for next time (instant hit)
+            answer_cache.set(ans_key, answer, ttl)
+
+            badge = "[dim green](cached)[/dim green]" if from_llm_cache else ""
+            console.print(Panel(
+                f"[bold white]{answer}[/bold white]",
+                title=f"[bold magenta]ALOA Answer[/bold magenta] {badge}",
+                border_style="magenta",
+            ))
+            return
+
+
+        # ── Action path (requires consent) ───────────────────────────
+        commands = plan.get("commands", [])
+        description = plan.get("description", "")
+
+        # If the plan has no commands, generate a full markdown plan
+        if not commands:
+            with Status("[bold cyan]Planning...[/bold cyan]", spinner="dots"):
+                plan_text = generate_action_plan(user_input)
+            
+            console.print(Panel(plan_text, title="[bold magenta]AI Implementation Plan[/bold magenta]", border_style="magenta"))
+            
+            extracted_cmds = extract_commands(plan_text)
+            if not extracted_cmds:
+                return
+            
+            consent = console.input("[bold yellow]Proceed? (y/n): [/bold yellow]").strip().lower()
+            if consent in ["y", "yes", ""]:
+                handle_llm_result("action", plan_text)
+            else:
+                console.print("[bold red]Action cancelled.[/bold red]")
+            return
+
+        # Show the plan clearly
+        cmd_list = "\n".join(f"  • [cyan]{c}[/cyan]" for c in commands)
+        console.print(Panel(
+            f"[bold]{description}[/bold]\n\n[dim]Commands to run:[/dim]\n{cmd_list}",
+            title="[bold magenta]AI Action Plan[/bold magenta]",
+            border_style="magenta",
+        ))
+
+        consent = "y"
+        if not (plan.get("instant") and plan.get("safe")):
+            consent = console.input("[bold yellow]Approve and execute? (y/n): [/bold yellow]").strip().lower()
+
+        if consent not in ["y", "yes", ""]:
+            console.print("[bold red]Action cancelled by user.[/bold red]")
+            return
+
+        from utils.shell import run_shell_command
+        success_count = 0
+        for cmd in commands:
+            if run_shell_command(cmd):
+                success_count += 1
+            else:
+                keep_going = console.input("[bold red]Step failed. Continue? (y/n): [/bold red]").strip().lower()
+                if keep_going != "y":
+                    break
+
+        from utils.formatting import success_panel
+        console.print(success_panel(
+            f"Done: {success_count}/{len(commands)} steps succeeded.",
+            title="Execution Complete",
+        ))
+
+
+    def _handle_unknown(self, cmd: ParsedCommand):
+        """Handle unknown commands."""
+        console.print(error_panel(
+            f"I didn't understand: [bold]{cmd.raw}[/bold]\n\n"
+            "Type [cyan]help[/cyan] to see available commands.",
+            title="Unknown Command"
+        ))
 
     # ── Built-in Handlers ───────────────────────────────────────────
 
