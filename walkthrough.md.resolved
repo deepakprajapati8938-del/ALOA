@@ -1,0 +1,92 @@
+# THE ALOA — Phase 1 Walkthrough
+
+## What Was Built
+
+A fully functional **Autonomous Laptop Operating Agent** for Windows with two major subsystems:
+
+### 1. Intelligent Application Lifecycle Manager
+| Feature | File | How It Works |
+|---|---|---|
+| Silent Install | [installer.py](file:///e:/miniproject/aloa/lifecycle/installer.py) | Searches winget, installs with `--silent` flags, auto-triggers PATH config + verification |
+| PATH Config | [path_config.py](file:///e:/miniproject/aloa/lifecycle/path_config.py) | Reads/writes user PATH via registry, auto-detects `bin/` dirs, broadcasts `WM_SETTINGCHANGE` |
+| Registry Detection | [registry.py](file:///e:/miniproject/aloa/lifecycle/registry.py) | Scans HKLM/HKCU uninstall keys for full app catalog with metadata |
+| Deep Uninstall | [uninstaller.py](file:///e:/miniproject/aloa/lifecycle/uninstaller.py) | Runs native uninstaller, removes AppData/caches/services, always previews first |
+| Verification | [verifier.py](file:///e:/miniproject/aloa/lifecycle/verifier.py) | Checks registry + PATH + version command, gives actionable verdict |
+
+### 2. Autonomous System Health & Performance Engine
+| Feature | File | How It Works |
+|---|---|---|
+| RAM Monitor | [ram_monitor.py](file:///e:/miniproject/aloa/health/ram_monitor.py) | `psutil.virtual_memory()`, top 10 memory consumers, color-coded severity |
+| CPU Monitor | [cpu_monitor.py](file:///e:/miniproject/aloa/health/cpu_monitor.py) | Per-core usage bars, spike detection, top CPU consumers |
+| Disk Inspector | [disk_inspector.py](file:///e:/miniproject/aloa/health/disk_inspector.py) | Per-drive usage, clutter scanning (temp/caches), large file detection |
+| Startup Analyzer | [startup_analyzer.py](file:///e:/miniproject/aloa/health/startup_analyzer.py) | Registry Run keys + Startup folder + scheduled tasks, impact classification |
+| Unused Apps | [unused_apps.py](file:///e:/miniproject/aloa/health/unused_apps.py) | Cross-references registry with file access timestamps |
+| Bottleneck Finder | [bottleneck.py](file:///e:/miniproject/aloa/health/bottleneck.py) | Composite RAM+CPU+Disk+Swap analysis, plain-English diagnosis |
+| Suggestions | [suggestions.py](file:///e:/miniproject/aloa/health/suggestions.py) | Ranked suggestions with interactive execution, temp cleanup |
+
+---
+
+## How to Run
+
+```powershell
+cd e:\miniproject\aloa
+pip install -r requirements.txt
+python main.py
+```
+
+Then use natural-language commands in the REPL:
+```
+ALOA ❯ install maven
+ALOA ❯ verify python
+ALOA ❯ health
+ALOA ❯ diagnose
+ALOA ❯ why is my laptop slow
+ALOA ❯ suggest
+ALOA ❯ startup
+ALOA ❯ cleanup
+```
+
+---
+
+## Verification Results
+
+| Test | Result |
+|---|---|
+| All 17 modules import | ✅ |
+| Parser: `install maven` → intent=install, target=maven | ✅ |
+| RAM reading (78.8% — matches Task Manager) | ✅ |
+| CPU reading (0.6%) | ✅ |
+| Disk reading (74.4%) | ✅ |
+| Bottleneck correctly identified RAM as primary | ✅ |
+| Dependencies install cleanly | ✅ |
+
+---
+
+## Project Structure
+
+```
+e:\miniproject\aloa\          (17 source files)
+├── main.py                   # Entry point + REPL
+├── requirements.txt          # psutil, rich
+├── core/
+│   ├── agent.py              # Command router
+│   ├── parser.py             # Intent extraction
+│   └── privileges.py         # Admin detection
+├── lifecycle/
+│   ├── installer.py          # winget silent install
+│   ├── path_config.py        # PATH management
+│   ├── registry.py           # App detection
+│   ├── uninstaller.py        # Deep uninstall
+│   └── verifier.py           # Install verification
+├── health/
+│   ├── ram_monitor.py        # RAM analysis
+│   ├── cpu_monitor.py        # CPU analysis
+│   ├── disk_inspector.py     # Disk + clutter
+│   ├── startup_analyzer.py   # Boot programs
+│   ├── unused_apps.py        # Unused detection
+│   ├── bottleneck.py         # Diagnosis engine
+│   └── suggestions.py        # Optimization + cleanup
+└── utils/
+    ├── formatting.py         # Rich output helpers
+    └── constants.py          # Config + thresholds
+```
