@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neon-purple: #C084FC;
+  --color-neon-pink: #F472B6;
+  --color-text-base: #F3E8FF;
+  --color-text-dim: #A78BCA;
+  --color-glass-bg: rgba(20, 8, 40, 0.75);
+  --color-taskbar-bg: rgba(15, 5, 30, 0.9);
+
+  --font-orbitron: var(--font-orbitron), sans-serif;
+  --font-inter: var(--font-inter), sans-serif;
+  --font-mono: var(--font-share-tech-mono), monospace;
+}
+
+:root {
+  --neon-purple: #C084FC;
+  --neon-pink: #F472B6;
+}
+
+body {
+  background-color: #05020a;
+  color: var(--color-text-base);
+  font-family: var(--font-inter);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Glass Surface Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(192, 132, 252, 0.2);
+}
+
+.glass-window {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(192, 132, 252, 0.3);
+  box-shadow: 0 0 40px rgba(192, 132, 252, 0.15);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 12px var(--neon-purple), 0 0 24px var(--neon-pink);
+  transform: scale(1.05);
+}
+
+/* Scanline Overlay */
+.scanlines {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: repeating-linear-gradient(to bottom,
+      transparent 0,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 2px,
+      rgba(0, 0, 0, 0.03) 4px);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(192, 132, 252, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(192, 132, 252, 0.6);
+}

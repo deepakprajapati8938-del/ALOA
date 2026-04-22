@@ -1,0 +1,132 @@
+{
+  "date": "April 22, 2026",
+  "hackernews": [
+    {
+      "title": "Claude Code to be removed from Anthropic's Pro plan?",
+      "url": "https://bsky.app/profile/edzitron.com/post/3mjzxwfx3qs2a",
+      "score": 500,
+      "comments": 486
+    },
+    {
+      "title": "Show HN: Backlit Keyboard API for Python",
+      "url": "https://github.com/itsmeadarsh2008/backlit-kbd",
+      "score": 25,
+      "comments": 4
+    },
+    {
+      "title": "Anthropic says OpenClaw-style Claude CLI usage is allowed again",
+      "url": "https://docs.openclaw.ai/providers/anthropic",
+      "score": 487,
+      "comments": 278
+    },
+    {
+      "title": "Making RAM at Home [video]",
+      "url": "https://www.youtube.com/watch?v=h6GWikWlAQA",
+      "score": 207,
+      "comments": 48
+    },
+    {
+      "title": "ChatGPT Images 2.0",
+      "url": "https://openai.com/index/introducing-chatgpt-images-2-0/",
+      "score": 709,
+      "comments": 543
+    }
+  ],
+  "company_news": [],
+  "github": [
+    {
+      "name": "Fincept-Corporation / FinceptTerminal",
+      "url": "https://github.com/Fincept-Corporation/FinceptTerminal",
+      "description": "FinceptTerminal is a modern finance application offering advanced market analytics, investment resea",
+      "stars_today": "2,548"
+    },
+    {
+      "name": "thunderbird / thunderbolt",
+      "url": "https://github.com/thunderbird/thunderbolt",
+      "description": "AI You Control: Choose your models. Own your data. Eliminate vendor lock-in.",
+      "stars_today": "596"
+    },
+    {
+      "name": "zilliztech / claude-context",
+      "url": "https://github.com/zilliztech/claude-context",
+      "description": "Code search MCP for Claude Code. Make entire codebase the context for any coding agent.",
+      "stars_today": "169"
+    },
+    {
+      "name": "ruvnet / RuView",
+      "url": "https://github.com/ruvnet/RuView",
+      "description": "π RuView: WiFi DensePose turns commodity WiFi signals into real-time human pose estimation, vital si",
+      "stars_today": "824"
+    },
+    {
+      "name": "microsoft / ai-agents-for-beginners",
+      "url": "https://github.com/microsoft/ai-agents-for-beginners",
+      "description": "12 Lessons to Get Started Building AI Agents",
+      "stars_today": "200"
+    }
+  ],
+  "devto": [
+    {
+      "title": "Java Collections: Everything You Need to Know About the List Interface",
+      "url": "https://dev.to/aj_arul/java-collections-everything-you-need-to-know-about-the-list-interface-24d0",
+      "author": "Arul .A",
+      "reactions": 7,
+      "tag": "Java"
+    },
+    {
+      "title": "Agent Development Kit 2.0, ADK-java 1,1 et Go 1.0 🚀",
+      "url": "https://dev.to/zenika/agent-development-kit-20-adk-java-11-et-go-10-2be5",
+      "author": "Jean-Phi Baconnais",
+      "reactions": 7,
+      "tag": "Java"
+    },
+    {
+      "title": "Process-First Design and the Independent Variation Principle: Two Paths to the Same Territory",
+      "url": "https://dev.to/yannick555/process-first-design-and-the-independent-variation-principle-two-paths-to-the-same-territory-c8j",
+      "author": "Yannick Loth",
+      "reactions": 6,
+      "tag": "Java"
+    },
+    {
+      "title": "Serverless applications on AWS with Lambda using Java 25, API Gateway and Aurora DSQL - Part 5 SnapStart and full priming",
+      "url": "https://dev.to/aws-heroes/serverless-applications-on-aws-with-lambda-using-java-25-api-gateway-and-aurora-dsql-part-5-3dlj",
+      "author": "Vadym Kazulkin",
+      "reactions": 3,
+      "tag": "Java"
+    },
+    {
+      "title": "I built a CLI that scaffolds complete multi-tenant SaaS apps",
+      "url": "https://dev.to/jeandavid_bonicel_32a0b2/i-built-a-cli-that-scaffolds-complete-multi-tenant-saas-apps-5fl",
+      "author": "Jean-David Bonicel",
+      "reactions": 1,
+      "tag": "Java"
+    }
+  ],
+  "reddit": [],
+  "packages": [
+    {
+      "package": "fastapi",
+      "latest": "0.136.0",
+      "url": "https://pypi.org/project/fastapi/"
+    },
+    {
+      "package": "langchain",
+      "latest": "1.2.15",
+      "url": "https://pypi.org/project/langchain/"
+    },
+    {
+      "package": "langgraph",
+      "latest": "1.1.9",
+      "url": "https://pypi.org/project/langgraph/"
+    }
+  ],
+  "report": {
+    "CURRENT AFFAIRS": "Anthropic has made a significant move by allowing OpenClaw-style Claude CLI usage again for its users. This decision may have implications for the larger AI development community. The company's stance on code usage demonstrates its willingness to adapt to user needs.",
+    "TECH NEWS": "In the world of AI development, several notable updates have occurred recently. Langchain and LangGraph have released new versions, v1.2.15 and v1.1.9 respectively, showcasing advancements in their respective areas. Additionally, the FinceptTerminal and zilliztech Claude-context projects on GitHub are gaining traction.",
+    "TRENDING TECH": "The Langchain framework and LangGraph AI are currently trending rapidly on GitHub and Dev.to. These tools are gaining popularity due to their utility in AI development and their ability to facilitate the creation of custom AI models.",
+    "GENERAL KNOWLEDGE": "The ADK-java 1.1 and Go 1.0 release highlights the growing importance of agent development in the tech industry. This trend reflects the increasing focus on creating autonomous systems that can interact with users and environments.",
+    "SUGGESTIONS": "1. The developer should explore the Langchain framework and LangGraph AI to understand their capabilities and potential applications in their current projects.\n2. They should consider contributing to the FinceptTerminal and zilliztech Claude-context projects on GitHub to gain experience with real-world AI development and networking opportunities.\n3. The developer should stay up-to-date with the latest developments in agent development by following the ADK-java and Go 1.0 releases, and exploring potential applications in their own work."
+  },
+  "from_cache": false,
+  "cached_at": "2026-04-22T12:27:01.615707"
+}
