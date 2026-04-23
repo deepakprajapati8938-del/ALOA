@@ -6,11 +6,11 @@ import warnings
 import re
 import json
 import time
-import urllib.request
-import urllib.error
 
 warnings.filterwarnings("ignore")
 os.environ["GRPC_VERBOSITY"] = "ERROR"
+
+from utils.memory import aloa_memory
 
 try:
     import google.generativeai as genai
@@ -99,6 +99,7 @@ def detect_project_type(folder_path):
             if any(f.endswith(ext) for f in files_in_root):
                 return proj_type, run_cmd
         elif sig_file in files_in_root:
+            aloa_memory.add_fact(folder_path, "is_type", proj_type)
             return proj_type, run_cmd
 
     # Fallback: detect by dominant extension
@@ -536,34 +537,13 @@ IMPORTANT RULES:
 
     def _call_openrouter(self, user_message):
         """
-        Call OpenRouter API (OpenAI-compatible) as a reliable fallback.
-        Uses urllib so no extra dependencies needed.
+        Fallback: use the shared LLM provider chain (Groq → OpenRouter → Gemini).
         """
-        try:
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://aloa-agent.local",
-                "X-Title": "ALOA Code Healer",
-            }
-            body = json.dumps({
-                "model": OPENROUTER_MODEL,
-                "messages": [
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                "max_tokens": 4096,
-            }).encode('utf-8')
-
-            req = urllib.request.Request(
-                "https://openrouter.ai/api/v1/chat/completions",
-                data=body, headers=headers, method='POST'
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                result = json.loads(resp.read().decode('utf-8'))
-                return result['choices'][0]['message']['content']
-        except Exception as e:
-            return f"AI ERROR: {str(e)}"
+        from utils.providers import call_llm
+        result = call_llm(prompt=user_message, system=self.system_prompt, use_cache=False, use_memory=True)
+        if result.startswith("⚠️"):
+            return f"AI ERROR: {result}"
+        return result
 
     def send_message(self, user_message, purpose='chat'):
         """
@@ -638,6 +618,7 @@ IMPORTANT RULES:
                 shutil.copy2(fix_path, backup_path)
             with open(fix_path, 'w', encoding='utf-8') as f:
                 f.write(self.last_fix_code)
+            aloa_memory.add_fact("ALOA", "fixed", self.last_fix_file, {"project": self.folder_path})
             return True, f"Fixed '{self.last_fix_file}' successfully. Backup saved as .bak"
         except Exception as e:
             return False, str(e)

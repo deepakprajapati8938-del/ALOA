@@ -2,8 +2,8 @@
 
 import Window from "@/components/shared/Window";
 import { useCommandLog } from "@/contexts/CommandLogContext";
-import { Activity, Trash2, ShieldX, Rocket } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Activity, Trash2, ShieldX, Rocket, BrainCircuit } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
 
 interface SystemProcess {
   name: string;
@@ -18,24 +18,32 @@ export default function SystemDoctor() {
   const [processes, setProcesses] = useState<SystemProcess[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await fetch("http://localhost:8000/api/system-doctor/stats");
       const data = await res.json();
+
+      // Guard: backend may return { detail: "..." } from _http_error helper
+      if (data.detail && data.cpu_total === undefined) {
+        addLog("🩺 System Doctor", "Stats Fetch", `Error: ${data.detail}`);
+        return;
+      }
+
       setCpu(data.cpu_total || 0);
       setRam(data.ram_total || 0);
       setProcesses(data.top_apps || []);
     } catch (err) {
       console.error("Failed to fetch system stats:", err);
     }
-  };
+  }, [addLog]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchStats();
-    const interval = setInterval(fetchStats, 10000); // refresh every 10s
+    Promise.resolve().then(() => fetchStats());
+    // Backend cache TTL for system stats is DYNAMIC = 60s.
+    // Poll every 65s to align with the cache window and avoid hammering.
+    const interval = setInterval(fetchStats, 65000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchStats]);
 
   const handleClean = async () => {
     setIsLoading(true);
@@ -68,6 +76,21 @@ export default function SystemDoctor() {
     } catch (err) {
       console.error(err);
       addLog("🩺 System Doctor", `Kill ${p}`, "Error connecting to backend");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleWipeMemory = async () => {
+    if (!window.confirm("Are you sure you want to wipe ALOA's Semantic Memory? This will delete all learned context.")) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/memory/clear", { method: "POST" });
+      const data = await res.json();
+      addLog("🩺 System Doctor", "Wipe Memory", data.message || "Memory cleared");
+    } catch (err) {
+      console.error(err);
+      addLog("🩺 System Doctor", "Wipe Memory", "Error connecting to backend");
     } finally {
       setIsLoading(false);
     }
@@ -134,6 +157,14 @@ export default function SystemDoctor() {
             className="flex-1 flex items-center justify-center gap-2 bg-white/5 border border-[var(--neon-purple)]/50 text-[var(--neon-purple)] py-2 rounded-md hover:bg-[var(--neon-purple)]/10 hover:shadow-[0_0_15px_rgba(192,132,252,0.3)] transition-all font-semibold"
           >
             <Rocket className="w-4 h-4" /> Startup Apps
+          </button>
+          <button
+            onClick={handleWipeMemory}
+            disabled={isLoading}
+            className="flex-1 flex items-center justify-center gap-2 bg-white/5 border border-yellow-500/50 text-yellow-500 py-2 rounded-md hover:bg-yellow-500/10 hover:shadow-[0_0_15px_rgba(234,179,8,0.3)] transition-all font-semibold disabled:opacity-50"
+            title="Clear AI Semantic Memory"
+          >
+            <BrainCircuit className="w-4 h-4" /> Wipe Memory
           </button>
         </div>
       </div>

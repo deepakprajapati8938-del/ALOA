@@ -2,7 +2,7 @@
 
 import Window from "@/components/shared/Window";
 import { useCommandLog } from "@/contexts/CommandLogContext";
-import { Bot, Send } from "lucide-react";
+import { Bot, Send, AlertTriangle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 interface Message {
@@ -10,6 +10,29 @@ interface Message {
   sender: "user" | "ai";
   text: string;
   actionable?: boolean;
+  isError?: boolean;
+}
+
+/**
+ * Strip known prefixes like "Generated command: " or "Generated: " from
+ * an AI message so the raw command is sent to /api/app-manager/execute.
+ */
+function extractCommand(messageText: string): string {
+  return messageText
+    .replace(/^Generated command:\s*/i, "")
+    .replace(/^Generated:\s*/i, "")
+    .replace(/\s*\(Executed\)\s*$/i, "")
+    .replace(/\s*\(Cancelled\)\s*$/i, "")
+    .trim();
+}
+
+/**
+ * Detect if an LLM response is an error sentinel from the fallback chain.
+ * The upgraded backend returns { command: "⚠️ All LLM providers failed..." }
+ * on failure instead of a 500 error.
+ */
+function isLLMError(text: string): boolean {
+  return text.startsWith("⚠️") || text.startsWith("AI ERROR");
 }
 
 export default function AppManager() {
@@ -22,7 +45,6 @@ export default function AppManager() {
   ]);
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -45,21 +67,41 @@ export default function AppManager() {
         body: JSON.stringify({ user_input: userMsg }),
       });
       const data = await res.json();
-      
+
+      // Handle HTTP error responses (400, 502, 500) from upgraded backend
+      if (!res.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: "ai",
+            text: data.detail || `Server error (${res.status})`,
+            actionable: false,
+            isError: true,
+          },
+        ]);
+        return;
+      }
+
+      const commandText = data.command || "Error generating command";
+      const errorDetected = isLLMError(commandText);
+
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           sender: "ai",
-          text: data.command || "Error generating command",
-          actionable: !!data.command,
+          text: errorDetected ? commandText : `Generated command: ${commandText}`,
+          // Never mark LLM error strings as actionable
+          actionable: !errorDetected && !!data.command,
+          isError: errorDetected,
         },
       ]);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [
         ...prev,
-        { id: Date.now().toString(), sender: "ai", text: "Connection error. Is backend running?" }
+        { id: Date.now().toString(), sender: "ai", text: "Connection error. Is backend running?", isError: true }
       ]);
     } finally {
       setIsLoading(false);
@@ -67,25 +109,27 @@ export default function AppManager() {
   };
 
   const handleConfirm = async (command: string, msgId: string) => {
-    addLog("🤖 App Manager", command, "Executing...");
-    
+    // Strip any "Generated command: " prefix before sending to the execute endpoint
+    const cleanCmd = extractCommand(command);
+    addLog("🤖 App Manager", cleanCmd, "Executing...");
+
     try {
       const res = await fetch("http://localhost:8000/api/app-manager/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command }),
+        body: JSON.stringify({ command: cleanCmd }),
       });
-      
+
       if (res.ok) {
-        addLog("🤖 App Manager", command, "Action executed ✅");
-        // Remove actionable buttons after executing
+        addLog("🤖 App Manager", cleanCmd, "Action executed ✅");
         setMessages((prev) => prev.map(m => m.id === msgId ? { ...m, actionable: false, text: `${m.text} (Executed)` } : m));
       } else {
-        addLog("🤖 App Manager", command, "Failed ❌");
+        const data = await res.json().catch(() => ({}));
+        addLog("🤖 App Manager", cleanCmd, data.detail || "Failed ❌");
       }
     } catch (err) {
       console.error(err);
-      addLog("🤖 App Manager", command, "Connection error ❌");
+      addLog("🤖 App Manager", cleanCmd, "Connection error ❌");
     }
   };
 
@@ -104,10 +148,17 @@ export default function AppManager() {
               className={`max-w-[85%] p-3 rounded-xl text-sm leading-relaxed ${
                 msg.sender === "user"
                   ? "self-end bg-white/5 border border-[var(--neon-pink)] rounded-br-sm"
-                  : "self-start bg-white/5 border border-[var(--neon-purple)] rounded-bl-sm"
+                  : msg.isError
+                    ? "self-start bg-rose-500/5 border border-rose-500/50 rounded-bl-sm"
+                    : "self-start bg-white/5 border border-[var(--neon-purple)] rounded-bl-sm"
               }`}
             >
-              {msg.text}
+              {msg.isError && (
+                <div className="flex items-center gap-1.5 mb-1.5 text-rose-400 text-xs font-semibold">
+                  <AlertTriangle className="w-3 h-3" /> LLM Error
+                </div>
+              )}
+              <span className={msg.isError ? "text-rose-300/80" : ""}>{msg.text}</span>
               {msg.actionable && (
                 <div className="mt-3 flex gap-2">
                   <button
@@ -116,7 +167,7 @@ export default function AppManager() {
                   >
                     Confirm ✅
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleCancel(msg.id)}
                     className="px-3 py-1 bg-white/5 hover:bg-white/10 border border-rose-500/50 text-rose-400 rounded-md transition-all hover:shadow-[0_0_10px_rgba(244,63,94,0.4)]"
                   >

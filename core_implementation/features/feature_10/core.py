@@ -381,17 +381,13 @@ def _parse_report(text):
 
 def ai_generate_report(watchlist, brief):
     """
-    Generate a professional 5-section intelligence report using Groq.
+    Generate a professional 5-section intelligence report via the shared LLM chain.
     Optionally uses the user's resume for highly targeted suggestions.
     Returns a dict {section_name: content} or None on failure.
     """
-    if not GROQ_API_KEY:
-        return None
+    from utils.providers import call_llm
 
     try:
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
-
         name      = watchlist.get("user_name", "")      or "the developer"
         role      = watchlist.get("current_role", "")   or "developer"
         stack     = ", ".join(watchlist.get("tech_stack",       [])) or "general tech"
@@ -455,13 +451,10 @@ ABSOLUTE RULES:
 - Each section under 70 words.
 - Do not repeat section header names in the body text."""
 
-        resp = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=600,
-            temperature=0.6,
-        )
-        raw    = resp.choices[0].message.content.strip()
+        raw = call_llm(prompt=prompt, ttl=300)
+        # If the provider chain returned an error sentinel, treat as failure
+        if raw.startswith("⚠️"):
+            return None
         parsed = _parse_report(raw)
         return parsed if parsed else {"RAW": strip_markdown(raw)}
 

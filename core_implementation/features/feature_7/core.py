@@ -23,6 +23,7 @@ import re
 import difflib
 
 from features.feature_6.core import scan_source_files, SOURCE_EXTENSIONS, SKIP_DIRS
+from utils.memory import aloa_memory
 
 
 # ──────────────────────────────────────────────────────────
@@ -61,27 +62,21 @@ def _call_bedrock(messages, system_prompt):
 
 
 def _call_openrouter(messages, system_prompt):
-    """Fallback: Calls Claude via OpenRouter (OpenAI-compatible API)."""
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://aloa-agent.local",
-        "X-Title": "ALOA Cloud Healer",
-    }
-    openai_messages = [{"role": "system", "content": system_prompt}] + messages
-    body = json.dumps({
-        "model": OPENROUTER_MODEL,
-        "messages": openai_messages,
-        "max_tokens": 4096,
-    }).encode("utf-8")
-
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/chat/completions",
-        data=body, headers=headers, method='POST'
-    )
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        result = json.loads(resp.read().decode('utf-8'))
-        return result['choices'][0]['message']['content']
+    """Fallback: Calls via OpenRouter (OpenAI-compatible API)."""
+    from utils.providers import OpenRouterProvider
+    import os
+    or_key = os.getenv("OPENROUTER_API_KEY", "")
+    if not or_key:
+        raise ConnectionError("OPENROUTER_API_KEY not set.")
+    # Build a single prompt from the conversation history
+    combined = system_prompt + "\n\n"
+    for msg in messages:
+        combined += f"[{msg['role'].upper()}]: {msg['content']}\n\n"
+    provider = OpenRouterProvider(or_key)
+    result = provider.generate(combined)
+    if result:
+        return result
+    raise ConnectionError("OpenRouter provider returned no response.")
 
 
 def call_ai(messages, system_prompt):
@@ -135,6 +130,7 @@ def setup_cloud_workspace(repo_url, pat, dest_folder):
             capture_output=True, text=True, timeout=120
         )
         if result.returncode == 0:
+            aloa_memory.add_fact("User", "works_on_repo", repo_url)
             return True, "Cloned successfully."
         else:
             return False, f"Git Clone Failed: {result.stderr.strip()}"

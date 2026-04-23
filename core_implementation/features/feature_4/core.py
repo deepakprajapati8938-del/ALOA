@@ -8,7 +8,6 @@ warnings.filterwarnings("ignore")
 os.environ["GRPC_VERBOSITY"] = "ERROR"
 
 try:
-    import google.generativeai as genai
     from fpdf import FPDF
 
     # --- youtube-transcript-api v1.x (new instance-based API) ---
@@ -16,15 +15,10 @@ try:
 
 except ImportError as e:
     print(f"\n[CRITICAL ERROR] Library Missing: {e}")
-    print("Run: pip install google-generativeai youtube-transcript-api fpdf2")
+    print("Run: pip install youtube-transcript-api fpdf2")
     sys.exit()
 
-# Load Gemini API key from env var
-API_KEY = os.environ.get("GEMINI_API_KEY_1", "")
-genai.configure(api_key=API_KEY)
-
-# Model preference order (gemini-2.0-flash is stable and widely available)
-GEMINI_MODELS = ["gemini-2.0-flash", "gemini-flash-latest"]
+from utils.providers import call_llm
 
 # Create a reusable API instance (youtube-transcript-api v1.x)
 ytt_api = YouTubeTranscriptApi()
@@ -67,7 +61,7 @@ def fetch_transcript(video_id):
         return f"ERROR: {error_msg}"
 
 def generate_structured_notes(transcript):
-    """Generates notes using Gemini AI. Tries multiple model versions as fallback."""
+    """Generates notes using the shared LLM fallback chain."""
     prompt = f"""
 Act as an Expert Professor. Analyze this transcript and create structured notes.
 
@@ -86,17 +80,10 @@ INSTRUCTIONS:
    ### 📝 Summary
 """
 
-    last_error = None
-    for model_name in GEMINI_MODELS:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            last_error = e
-            continue  # Try next model
-
-    return f"AI PROCESSING ERROR: {last_error}"
+    result = call_llm(prompt=prompt, ttl=300)
+    if result.startswith("⚠️"):
+        return f"AI PROCESSING ERROR: {result}"
+    return result
 
 def save_notes_to_file(title, content):
     """Saves to MD and PDF."""

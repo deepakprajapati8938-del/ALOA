@@ -26,3 +26,7 @@ pytesseract
 fastapi
 uvicorn
 psutil
+networkx
+pydantic
+llama-cpp-python
+pydantic-settings

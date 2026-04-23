@@ -12,28 +12,14 @@ import re
 import copy
 import time
 import html as html_mod
-import urllib.request
-import urllib.error
 import warnings
 import webbrowser
 import subprocess
 
 warnings.filterwarnings("ignore")
 
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
-
-# ══════════════════════════════════════════════════════════
-# API KEYS (same pattern as Feature 6)
-# ══════════════════════════════════════════════════════════
-
-GEMINI_API_KEY_1 = os.environ.get("GEMINI_API_KEY_1", "")
-GEMINI_API_KEY_2 = os.environ.get("GEMINI_API_KEY_2", "")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = "openrouter/auto"
-GEMINI_MODELS = ["gemini-2.0-flash", "gemini-flash-latest"]
+from utils.providers import call_llm as _shared_call_llm
+from utils.memory import aloa_memory
 
 # ══════════════════════════════════════════════════════════
 # DIRECTORIES
@@ -48,6 +34,19 @@ def ensure_dirs():
     """Create profiles and output directories if they don't exist."""
     os.makedirs(PROFILES_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def call_llm(prompt, system_prompt=""):
+    """
+    Adapter: the rest of Feature 9 calls call_llm(prompt, system_prompt=...).
+    Map to the shared call_llm(prompt=, system=).
+    """
+    result = _shared_call_llm(prompt=prompt, system=system_prompt, ttl=120)
+    # The shared call_llm never returns None — it returns an error sentinel string.
+    # Map the sentinel to [LLM ERROR] so existing code still works.
+    if result.startswith("⚠️"):
+        return f"[LLM ERROR] {result}"
+    return result
 
 
 # ══════════════════════════════════════════════════════════
@@ -155,73 +154,6 @@ def get_profile_status(profile):
     status["Strengths"] = (bool(strengths), f"{len(strengths)} item(s)" if strengths else "Empty", "✅" if strengths else "⬜")
 
     return status
-
-
-# ══════════════════════════════════════════════════════════
-# LLM INTEGRATION
-# ══════════════════════════════════════════════════════════
-
-def _call_gemini(prompt, system_prompt=""):
-    """Call Gemini API. Tries multiple keys and models."""
-    if genai is None:
-        return None
-
-    for key in [GEMINI_API_KEY_1, GEMINI_API_KEY_2]:
-        genai.configure(api_key=key)
-        for model_name in GEMINI_MODELS:
-            try:
-                model = genai.GenerativeModel(
-                    model_name,
-                    system_instruction=system_prompt if system_prompt else None
-                )
-                response = model.generate_content(prompt)
-                if response and response.text:
-                    return response.text
-            except Exception as e:
-                err = str(e).lower()
-                if '429' in err or 'quota' in err or 'rate' in err:
-                    continue
-                continue
-    return None
-
-
-def _call_openrouter(prompt, system_prompt=""):
-    """Call OpenRouter API as fallback. Always available."""
-    try:
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://aloa-agent.local",
-            "X-Title": "ALOA Resume Engine",
-        }
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        body = json.dumps({
-            "model": OPENROUTER_MODEL,
-            "messages": messages,
-            "max_tokens": 4096,
-        }).encode('utf-8')
-
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
-            data=body, headers=headers, method='POST'
-        )
-        with urllib.request.urlopen(req, timeout=90) as resp:
-            result = json.loads(resp.read().decode('utf-8'))
-            return result['choices'][0]['message']['content']
-    except Exception as e:
-        return f"[LLM ERROR] {str(e)}"
-
-
-def call_llm(prompt, system_prompt=""):
-    """Call LLM: tries Gemini first, falls back to OpenRouter."""
-    result = _call_gemini(prompt, system_prompt)
-    if result and not result.startswith("[LLM ERROR]"):
-        return result
-    return _call_openrouter(prompt, system_prompt)
 
 
 # ══════════════════════════════════════════════════════════
@@ -335,6 +267,14 @@ def extract_profile_from_text(raw_text):
         for key in base:
             if key in profile:
                 base[key] = profile[key]
+        
+        # Memory Hook
+        full_name = base.get("personal", {}).get("full_name")
+        if full_name:
+            aloa_memory.add_fact("User", "has_name", full_name)
+            for skill in base.get("skills", [])[:5]: # Top 5 skills
+                aloa_memory.add_fact("User", "knows_skill", skill.get("name", ""))
+                
         return base
     except json.JSONDecodeError:
         # Try to find JSON in the response
@@ -346,6 +286,14 @@ def extract_profile_from_text(raw_text):
                 for key in base:
                     if key in profile:
                         base[key] = profile[key]
+                
+                # Memory Hook
+                full_name = base.get("personal", {}).get("full_name")
+                if full_name:
+                    aloa_memory.add_fact("User", "has_name", full_name)
+                    for skill in base.get("skills", [])[:5]:
+                        aloa_memory.add_fact("User", "knows_skill", skill.get("name", ""))
+                        
                 return base
             except json.JSONDecodeError:
                 pass

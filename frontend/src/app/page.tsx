@@ -7,6 +7,11 @@ import Attendance from "@/components/apps/Attendance";
 import LectureNotes from "@/components/apps/LectureNotes";
 import AloaRadar from "@/components/apps/AloaRadar";
 import Terminal from "@/components/apps/Terminal";
+import ExamPilot from "@/components/apps/ExamPilot";
+import CodeHealer from "@/components/apps/CodeHealer";
+import CloudHealer from "@/components/apps/CloudHealer";
+import AutoDeployer from "@/components/apps/AutoDeployer";
+import ResumeEngine from "@/components/apps/ResumeEngine";
 import AuroraWake from "@/components/shared/AuroraWake";
 
 export default function Home() {
@@ -33,15 +38,22 @@ export default function Home() {
       <BootScreen />
 
       {/* L2 - Desktop Surface (Windows Render Here) */}
-      <div className="fixed inset-0 z-10 w-full h-[calc(100vh-96px)] bg-[linear-gradient(rgba(192,132,252,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(192,132,252,0.04)_1px,transparent_1px)] bg-[size:40px_40px]">
+      <div className="fixed inset-0 z-10 w-full h-[calc(100vh-56px)] bg-[linear-gradient(rgba(192,132,252,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(192,132,252,0.04)_1px,transparent_1px)] bg-[size:40px_40px]">
 
-        {/* Mount Window Apps */}
+        {/* Feature 1–5 (original) */}
         <AppManager />
         <SystemDoctor />
         <Attendance />
         <LectureNotes />
         <AloaRadar />
         <Terminal />
+
+        {/* Feature 5–10 (new) */}
+        <ExamPilot />
+        <CodeHealer />
+        <CloudHealer />
+        <AutoDeployer />
+        <ResumeEngine />
 
       </div>
 

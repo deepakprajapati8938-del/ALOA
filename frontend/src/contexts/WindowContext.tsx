@@ -2,7 +2,18 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
 
-export type WindowId = "appManager" | "sysDoctor" | "attendance" | "lectureNotes" | "aloaRadar" | "terminal";
+export type WindowId =
+  | "appManager"
+  | "sysDoctor"
+  | "attendance"
+  | "lectureNotes"
+  | "aloaRadar"
+  | "terminal"
+  | "examPilot"
+  | "codeHealer"
+  | "cloudHealer"
+  | "autoDeployer"
+  | "resumeEngine";
 
 export interface WindowState {
   id: WindowId;
@@ -20,51 +31,52 @@ interface WindowContextProps {
 }
 
 const defaultWindows: Record<WindowId, WindowState> = {
-  appManager: { id: "appManager", isOpen: false, isMinimized: false, zIndex: 10 },
-  sysDoctor: { id: "sysDoctor", isOpen: false, isMinimized: false, zIndex: 10 },
-  attendance: { id: "attendance", isOpen: false, isMinimized: false, zIndex: 10 },
-  lectureNotes: { id: "lectureNotes", isOpen: false, isMinimized: false, zIndex: 10 },
-  aloaRadar: { id: "aloaRadar", isOpen: false, isMinimized: false, zIndex: 10 },
-  terminal: { id: "terminal", isOpen: false, isMinimized: false, zIndex: 10 },
+  appManager:    { id: "appManager",    isOpen: false, isMinimized: false, zIndex: 10 },
+  sysDoctor:     { id: "sysDoctor",     isOpen: false, isMinimized: false, zIndex: 10 },
+  attendance:    { id: "attendance",    isOpen: false, isMinimized: false, zIndex: 10 },
+  lectureNotes:  { id: "lectureNotes",  isOpen: false, isMinimized: false, zIndex: 10 },
+  aloaRadar:     { id: "aloaRadar",     isOpen: false, isMinimized: false, zIndex: 10 },
+  terminal:      { id: "terminal",      isOpen: false, isMinimized: false, zIndex: 10 },
+  examPilot:     { id: "examPilot",     isOpen: false, isMinimized: false, zIndex: 10 },
+  codeHealer:    { id: "codeHealer",    isOpen: false, isMinimized: false, zIndex: 10 },
+  cloudHealer:   { id: "cloudHealer",   isOpen: false, isMinimized: false, zIndex: 10 },
+  autoDeployer:  { id: "autoDeployer",  isOpen: false, isMinimized: false, zIndex: 10 },
+  resumeEngine:  { id: "resumeEngine",  isOpen: false, isMinimized: false, zIndex: 10 },
 };
 
 const WindowContext = createContext<WindowContextProps | undefined>(undefined);
 
 export const WindowProvider = ({ children }: { children: ReactNode }) => {
   const [windows, setWindows] = useState<Record<WindowId, WindowState>>(defaultWindows);
-  const [maxZIndex, setMaxZIndex] = useState(10);
+  const [, setMaxZIndex] = useState(10);
 
   const focusWindow = (id: WindowId) => {
-    setMaxZIndex((prev) => prev + 1);
-    setWindows((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], zIndex: maxZIndex + 1 },
-    }));
+    setMaxZIndex((prevMax) => {
+      const newMax = prevMax + 1;
+      setWindows((prevWindows) => ({
+        ...prevWindows,
+        [id]: { ...prevWindows[id], zIndex: newMax },
+      }));
+      return newMax;
+    });
   };
 
   const openWindow = (id: WindowId) => {
-    setMaxZIndex((prev) => prev + 1);
-    setWindows((prev) => {
-      const isCurrentlyOpen = prev[id].isOpen;
-      if (isCurrentlyOpen && !prev[id].isMinimized) {
-        // Just focus
-        return {
-          ...prev,
-          [id]: { ...prev[id], zIndex: maxZIndex + 1 },
-        };
-      }
-      return {
-        ...prev,
-        [id]: { ...prev[id], isOpen: true, isMinimized: false, zIndex: maxZIndex + 1 },
-      };
+    setMaxZIndex((prevMax) => {
+      const newMax = prevMax + 1;
+      setWindows((prevWindows) => {
+        const isCurrentlyOpen = prevWindows[id].isOpen;
+        if (isCurrentlyOpen && !prevWindows[id].isMinimized) {
+          return { ...prevWindows, [id]: { ...prevWindows[id], zIndex: newMax } };
+        }
+        return { ...prevWindows, [id]: { ...prevWindows[id], isOpen: true, isMinimized: false, zIndex: newMax } };
+      });
+      return newMax;
     });
   };
 
   const closeWindow = (id: WindowId) => {
-    setWindows((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], isOpen: false },
-    }));
+    setWindows((prev) => ({ ...prev, [id]: { ...prev[id], isOpen: false } }));
   };
 
   const toggleMinimize = (id: WindowId) => {

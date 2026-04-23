@@ -4,84 +4,11 @@ import subprocess
 import tempfile
 import tkinter as tk
 from tkinter import messagebox
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-import json
-import urllib.request
-import urllib.error
 
-class DualModelChain:
-    def __init__(self, groq_chain, system_prompt):
-        self.groq_chain = groq_chain
-        self.system_prompt = system_prompt
-        
-    def invoke(self, inputs):
-        try:
-            if self.groq_chain:
-                return self.groq_chain.invoke(inputs)
-        except Exception as e:
-            err_str = str(e).lower()
-            if "403" in err_str or "429" in err_str or "access denied" in err_str:
-                print(f"\n  [App Manager] Groq API blocked by Network. Falling back to OpenRouter...")
-                return self.openrouter_fallback(inputs)
-            else:
-                print(f"\n  [App Manager] Groq Error: {e}. Falling back to OpenRouter...")
-                return self.openrouter_fallback(inputs)
-        return self.openrouter_fallback(inputs)
-
-    def openrouter_fallback(self, inputs):
-        user_input = inputs.get("input", "")
-        key = os.environ.get("OPENROUTER_API_KEY", "")
-        if not key:
-            raise RuntimeError("OPENROUTER_API_KEY missing. Cannot fallback.")
-            
-        headers = {
-            "Authorization": f"Bearer {key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://aloa.local",
-            "X-Title": "ALOA App Manager",
-        }
-        body = json.dumps({
-            "model": "openrouter/auto",
-            "messages": [
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": user_input}
-            ],
-            "temperature": 0
-        }).encode('utf-8')
-
-        req = urllib.request.Request(
-            "https://openrouter.ai/api/v1/chat/completions",
-            data=body, headers=headers, method='POST'
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                result = json.loads(resp.read().decode('utf-8'))
-                return result['choices'][0]['message']['content']
-        except urllib.error.HTTPError as e:
-            err_msg = e.read().decode('utf-8')
-            raise RuntimeError(f"OpenRouter Fallback Failed (HTTP {e.code}): {err_msg}")
-        except Exception as e:
-            raise RuntimeError(f"OpenRouter Fallback also failed: {e}")
-
-# ============================================================
-# 1. AI Setup — Groq (no local server required)
-#    Free API key from: https://console.groq.com
-#    Set env var: GROQ_API_KEY=your_key
-#    Or paste your key below (less secure):
-# ============================================================
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")  # Set your key here or in env
-
-llm = None
-if GROQ_API_KEY:
-    try:
-        llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0, api_key=GROQ_API_KEY)
-    except Exception as e:
-        print(f"[App Manager] Warning: Groq init failed: {e}")
+from utils.providers import call_llm
 
 # --- MASTER PROMPT ---
-system_prompt = """
+SYSTEM_PROMPT = """
 You are "The ALOA", a Windows System Assistant.
 Output ONLY the raw command. No markdown. No explanation.
 
@@ -120,17 +47,15 @@ User: "Download Cursor AI"
 Output: winget install "Cursor" -e --silent --accept-package-agreements --accept-source-agreements
 """
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("user", "{input}")
-])
 
-command_chain = None
-if llm:
-    base_chain = prompt | llm | StrOutputParser()
-    command_chain = DualModelChain(base_chain, system_prompt)
-else:
-    command_chain = DualModelChain(None, system_prompt)
+class UnifiedCommandChain:
+    """Wraps the shared call_llm() to provide the same .invoke() interface."""
+    def invoke(self, inputs):
+        user_input = inputs.get("input", "")
+        return call_llm(prompt=user_input, system=SYSTEM_PROMPT, ttl=60, use_memory=True)
+
+
+command_chain = UnifiedCommandChain()
 
 
 # ============================================================
@@ -234,6 +159,8 @@ def get_user_confirmation(command):
         return ans == "y"
 
 
+from utils.memory import aloa_memory
+
 def launch_app(app_name):
     """
     PowerShell se app launch karta hai — 4 strategies use karta hai:
@@ -303,6 +230,7 @@ def execute_command(command):
     if command.lower().startswith("start "):
         app_name = command[6:].strip()
         launch_app(app_name)
+        aloa_memory.add_fact("User", "launched", app_name)
         print()
 
     # --- CASE 2: INSTALL APP (winget install) ---
@@ -337,11 +265,10 @@ def run():
     print("=" * 50)
     print("  Type 'back' to return to menu, 'exit' to quit.\n")
 
-    # Check API key on entry
-    if not GROQ_API_KEY and not os.environ.get("OPENROUTER_API_KEY"):
-        print("  ⚠️  WARNING: Neither GROQ_API_KEY nor OPENROUTER_API_KEY is set.")
-        print("  Get a free key at https://console.groq.com")
-        print("  Or configure OpenRouter in the .env file.\n")
+    # API availability check (handled by call_llm fallback chain)
+    if not any(os.environ.get(k) for k in ["GROQ_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY_1"]):
+        print("  ⚠️  WARNING: No LLM API keys configured.")
+        print("  Set GROQ_API_KEY, OPENROUTER_API_KEY, or GEMINI_API_KEY_1 in .env\n")
 
     while True:
         try:

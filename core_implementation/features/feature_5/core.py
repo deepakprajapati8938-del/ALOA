@@ -1,38 +1,14 @@
+import os
 import cv2
 import numpy as np
 import pytesseract
 import mss
-import google.generativeai as genai
 import json
-import time
+
+from utils.providers import call_llm
 
 # --- CONFIGURATION ---
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-import os
-
-# KEYS — Feature 5 dedicated Gemini keys (3-key rotation)
-API_KEYS = [v for v in [
-    os.environ.get("GEMINI_API_KEY_F5_1", ""),
-    os.environ.get("GEMINI_API_KEY_F5_2", ""),
-    os.environ.get("GEMINI_API_KEY_F5_3", ""),
-] if v]
-if not API_KEYS:
-    API_KEYS = [""]
-current_key_index = 0
-
-def configure_genai():
-    global current_key_index
-    try:
-        genai.configure(api_key=API_KEYS[current_key_index])
-    except: pass
-configure_genai()
-
-def rotate_api_key():
-    global current_key_index
-    current_key_index = (current_key_index + 1) % len(API_KEYS)
-    configure_genai()
-    print(f"\n ♻️  Switching Key...")
+pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_CMD", r'C:\Program Files\Tesseract-OCR\tesseract.exe')
 
 # --- CORE FUNCTIONS ---
 
@@ -46,7 +22,6 @@ def capture_screen():
         # Convert to Grayscale
         gray_image = cv2.cvtColor(img_np, cv2.COLOR_BGRA2GRAY)
         
-        # FIX: Sirf Image return kar rahe hain (Tuple nahi)
         return gray_image
 
 def extract_text_with_coords(image):
@@ -65,30 +40,22 @@ def extract_text_with_coords(image):
         return None, None
 
 def get_ai_answer(context_text):
-    max_retries = len(API_KEYS) + 1
-    attempts = 0
-    while attempts < max_retries:
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            prompt = f"""
-            Quiz Solver. 
-            TEXT: "{context_text}"
-            FORMAT (Strict JSON): {{"correct_option_text": "Answer Text", "confidence": "High"}}
-            """
-            response = model.generate_content(prompt)
-            clean_text = response.text.replace("```json", "").replace("```", "").strip()
-            return json.loads(clean_text)
-        except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower():
-                rotate_api_key(); attempts += 1; time.sleep(1)
-            elif "404" in str(e):
-                try: 
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
-                    return json.loads(response.text.replace("```json", "").replace("```", "").strip())
-                except: rotate_api_key(); attempts += 1
-            else: return {"error": str(e)}
-    return {"error": "Keys Exhausted"}
+    """Solve a quiz question using the shared LLM fallback chain."""
+    prompt = f"""
+Quiz Solver. 
+TEXT: "{context_text}"
+FORMAT (Strict JSON): {{"correct_option_text": "Answer Text", "confidence": "High"}}
+"""
+    try:
+        result = call_llm(prompt=prompt, system="You are an expert quiz solver. Return only valid JSON.", ttl=30)
+        if result.startswith("⚠️"):
+            return {"error": result}
+        clean_text = result.replace("```json", "").replace("```", "").strip()
+        return json.loads(clean_text)
+    except json.JSONDecodeError:
+        return {"error": f"Could not parse AI response: {result[:200]}"}
+    except Exception as e:
+        return {"error": str(e)}
 
 def find_coordinates_of_text(target_text, ocr_data):
     if not target_text: return None
